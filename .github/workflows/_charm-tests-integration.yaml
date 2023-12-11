@@ -49,7 +49,7 @@ jobs:
           inputs.provider == 'microk8s'
         uses: charmed-kubernetes/actions-operator@main
         with:
-          juju-channel: 3.1/edge
+          juju-channel: 3.2/stable
           provider: microk8s
           channel: 1.26-strict/stable
           microk8s-group: snap_microk8s
