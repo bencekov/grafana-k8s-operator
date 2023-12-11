@@ -8,5 +8,8 @@ on:
 jobs:
   pull-request:
     name: PR
-    uses: canonical/observability/.github/workflows/charm-pull-request.yaml@main
+    uses: bencekov/grafana-k8s-operator/.github/workflows/charm-pull-request.yaml@test-implement-oauth-interface
     secrets: inherit
+    with:
+      ip-range-start: 10.64.140.43
+      ip-range-end: 10.64.140.46

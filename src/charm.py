@@ -29,7 +29,7 @@ import string
 import time
 from io import StringIO
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Callable, Dict, cast
 from urllib.parse import urlparse
 import subprocess
 
@@ -41,6 +41,12 @@ from charms.grafana_k8s.v0.grafana_source import (
     GrafanaSourceConsumer,
     GrafanaSourceEvents,
     SourceFieldsMissingError,
+)
+from charms.hydra.v0.oauth import (
+    ClientConfig,
+    OAuthInfoChangedEvent,
+    OAuthInfoRemovedEvent,
+    OAuthRequirer,
 )
 from charms.observability_libs.v0.kubernetes_compute_resources_patch import (
     K8sResourcePatchFailedEvent,
@@ -106,6 +112,9 @@ PORT = 3000
 TRUSTED_CA_TEMPLATE = string.Template(
     "/usr/local/share/ca-certificates/trusted-ca-cert-$rel_id-ca.crt"
 )
+OAUTH = "oauth"
+OAUTH_SCOPES = "openid email offline_access"
+OAUTH_GRANT_TYPES = ["authorization_code", "refresh_token"]
 
 
 class GrafanaCharm(CharmBase):
@@ -252,6 +261,16 @@ class GrafanaCharm(CharmBase):
             self.trusted_cert_transfer.on.certificate_removed,
             self._on_trusted_certificate_removed,  # pyright: ignore
         )
+        # oauth relation
+        self.oauth = OAuthRequirer(self, self._oauth_client_config)
+
+        # oauth relation observations
+        self.framework.observe(
+            self.oauth.on.oauth_info_changed, self._on_oauth_info_changed  # pyright: ignore
+        )
+        self.framework.observe(
+            self.oauth.on.oauth_info_removed, self._on_oauth_info_removed  # pyright: ignore
+        )
 
         # self.catalog = CatalogueConsumer(charm=self, item=self._catalogue_item)
 
@@ -290,6 +309,8 @@ class GrafanaCharm(CharmBase):
 
     def _on_ingress_ready(self, _) -> None:
         """Once Traefik tells us our external URL, make sure we reconfigure Grafana."""
+        self.oauth.update_client_config(client_config=self._oauth_client_config)
+
         self._configure()
 
     def _configure_ingress(self, event: HookEvent) -> None:
@@ -709,10 +730,16 @@ class GrafanaCharm(CharmBase):
         For now, this only creates database information, since everything else
         can be set in ENV variables, but leave for expansion later so we can
         hide auth secrets
+
+        The feature toggle accessTokenExpirationCheck is also set here. It's needed
+        for the oauth relation to provide refresh tokens.
         """
         configs = []
         if self.has_db:
             configs.append(self._generate_database_config())
+
+        if self.oauth.is_client_created():
+            configs.append(self._generate_oauth_refresh_config())
 
         return "\n".join(configs)
 
@@ -905,6 +932,25 @@ class GrafanaCharm(CharmBase):
                 {
                     "GF_SERVER_CERT_KEY": "/etc/grafana/grafana.key",
                     "GF_SERVER_CERT_FILE": "/etc/grafana/grafana.crt",
+                }
+            )
+
+        if self.oauth.is_client_created():
+            oauth_provider_info = self.oauth.get_provider_info()
+
+            extra_info.update(
+                {
+                    "GF_AUTH_GENERIC_OAUTH_ENABLED": "True",
+                    "GF_AUTH_GENERIC_OAUTH_NAME": "external identity provider",
+                    "GF_AUTH_GENERIC_OAUTH_CLIENT_ID": cast(str, oauth_provider_info.client_id),
+                    "GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET": cast(
+                        str, oauth_provider_info.client_secret
+                    ),
+                    "GF_AUTH_GENERIC_OAUTH_SCOPES": OAUTH_SCOPES,
+                    "GF_AUTH_GENERIC_OAUTH_AUTH_URL": oauth_provider_info.authorization_endpoint,
+                    "GF_AUTH_GENERIC_OAUTH_TOKEN_URL": oauth_provider_info.token_endpoint,
+                    "GF_AUTH_GENERIC_OAUTH_API_URL": oauth_provider_info.userinfo_endpoint,
+                    "GF_AUTH_GENERIC_OAUTH_USE_REFRESH_TOKEN": "True",
                 }
             )
 
@@ -1373,8 +1419,36 @@ class GrafanaCharm(CharmBase):
         container = self.containers["workload"]
         cert_path = TRUSTED_CA_TEMPLATE.substitute(rel_id=event.relation_id)
         container.remove_path(cert_path, recursive=True)
-
         self.restart_grafana()
+
+    @property
+    def _oauth_client_config(self) -> ClientConfig:
+        return ClientConfig(
+            os.path.join(self.external_url, "login/generic_oauth"),
+            OAUTH_SCOPES,
+            OAUTH_GRANT_TYPES,
+        )
+
+    def _on_oauth_info_changed(self, event: OAuthInfoChangedEvent) -> None:
+        """Event handler for the oauth_info_changed event."""
+        logger.info(f"Received oauth provider info: {self.oauth.get_provider_info()}")
+
+        self._configure()
+
+    def _on_oauth_info_removed(self, event: OAuthInfoRemovedEvent) -> None:
+        """Event handler for the oauth_info_removed event."""
+        logger.info("Oauth relation is broken, removing related settings")
+
+        # Reset generic_oauth settings
+        self._configure()
+
+    def _generate_oauth_refresh_config(self) -> str:
+        """Generate a configuration for automatic refreshing of oauth authentication.
+
+        Returns:
+            A string containing the required feature toggle information to be stubbed into the config file.
+        """
+        return "[feature_toggles]\naccessTokenExpirationCheck = true\n"
 
 
 if __name__ == "__main__":
