@@ -65,7 +65,7 @@ jobs:
     needs:
       - ci-ignore
     if: needs.ci-ignore.outputs.any_modified == 'true'
-    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-quality-checks.yaml
+    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-quality-checks.yaml@test-implement-oauth-interface
     secrets: inherit
     with:
       charm-path: ${{ inputs.charm-path }}
