@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    uses: bencekov/observability/.github/workflows/charm-release.yaml@main
+    uses: canonical/observability/.github/workflows/charm-release.yaml@main
     secrets: inherit
     with:
       ip-range-start: 10.64.140.43
