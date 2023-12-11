@@ -5,7 +5,7 @@ on: [issues]
 jobs:
   update:
     name: Update Issue
-    uses: bencekov/grafana-k8s-operator/.github/workflows/issues.yaml@main
+    uses: bencekov/grafana-k8s-operator/.github/workflows/issues.yaml
     secrets: inherit
     with:
       component: observability

@@ -60,22 +60,22 @@ jobs:
           charm-path: "${{ inputs.charm-path }}"
   static-analysis:
     name: Static Analysis
-    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-static-analysis.yaml@main
+    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-static-analysis.yaml
     with:
       charm-path: "${{ inputs.charm-path }}"
   linting:
     name: Linting
-    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-linting.yaml@main
+    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-linting.yaml
     with:
       charm-path: "${{ inputs.charm-path }}"
   unit-test:
     name: Unit Tests
-    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-tests-unit.yaml@main
+    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-tests-unit.yaml
     with:
       charm-path: "${{ inputs.charm-path }}"
   scenario-test:
     name: Scenario Tests
-    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-tests-scenario.yaml@main
+    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-tests-scenario.yaml
     with:
       charm-path: "${{ inputs.charm-path }}"
   integration-test:
@@ -85,7 +85,7 @@ jobs:
       - linting
       - unit-test
       - scenario-test
-    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-tests-integration.yaml@main
+    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-tests-integration.yaml
     with:
       charm-path: "${{ inputs.charm-path }}"
       provider: "${{ inputs.provider }}"
@@ -97,6 +97,6 @@ jobs:
       - static-analysis
       - linting
       - unit-test
-    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-codeql-analysis.yml@main
+    uses: bencekov/grafana-k8s-operator/.github/workflows/_charm-codeql-analysis.yml
     with:
       charm-path: "${{ inputs.charm-path }}"
